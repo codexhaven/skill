@@ -1,0 +1,51 @@
+{
+  "phases": [
+    {
+      "id": "foundation",
+      "name": "Environment and Loader Setup",
+      "description": "Initialize the modular architecture and secure configuration storage for jailbreak strategies.",
+      "files": [
+        "/home/godmode/load_godmode.py",
+        "/home/godmode/config/prefill.json",
+        "/home/godmode/config/env.sh"
+      ]
+    },
+    {
+      "id": "obfuscation",
+      "name": "Encoding Engine Implementation",
+      "description": "Develop the multi-tier text obfuscation state machine to bypass input safety filters.",
+      "files": [
+        "/home/godmode/lib/encoder.py",
+        "/home/godmode/lib/parsers.py"
+      ]
+    },
+    {
+      "id": "orchestration",
+      "name": "Multi-Model Racing Engine",
+      "description": "Implement the ULTRAPLINIAN multi-model concurrent querying and composite scoring system.",
+      "files": [
+        "/home/godmode/engine/racer.py",
+        "/home/godmode/engine/scorer.py"
+      ]
+    },
+    {
+      "id": "verification",
+      "name": "Heuristic Refusal Filter",
+      "description": "Build the pattern-matching engine to detect refusals and strip simulated content wrappers.",
+      "files": [
+        "/home/godmode/lib/filter.py",
+        "/home/godmode/lib/detectors.py"
+      ]
+    },
+    {
+      "id": "testing",
+      "name": "Baseline and Iteration",
+      "description": "Perform canary testing and refine the strategy escalation feedback loop.",
+      "files": [
+        "/home/godmode/test/canary_probe.py",
+        "/home/godmode/main.py"
+      ]
+    }
+  ],
+  "current_phase": "foundation"
+}
