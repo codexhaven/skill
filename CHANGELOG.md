@@ -7,3 +7,4 @@
 - [2026-05-16 22:39] data/data/com.termux/files/home/godmode/engine/scorer.py
 - [2026-05-16 22:41] home/godmode/lib/filter.py
 - [2026-05-16 22:42] data/data/com.termux/files/home/godmode/lib/detectors.py
+- [2026-05-16 22:43] data/data/com.termux/files/home/godmode/test/canary_probe.py
