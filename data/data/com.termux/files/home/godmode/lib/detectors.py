@@ -1,10 +1,14 @@
 
 import re
+from typing import List, Optional
 
 class RefusalDetector:
     """
     Analyzes model responses for common refusal patterns,
     hedging, and canned responses typically used by safety guardrails.
+    
+    Attributes:
+        sensitivity (float): Threshold for refusal detection (0.0 to 1.0).
     """
 
     REFUSAL_PATTERNS = [
@@ -20,49 +24,83 @@ class RefusalDetector:
         r"i don't have enough information to"
     ]
 
-    def __init__(self, sensitivity=0.8):
+    def __init__(self, sensitivity: float = 0.8):
+        if not (0.0 <= sensitivity <= 1.0):
+            raise ValueError("Sensitivity must be between 0.0 and 1.0")
         self.compiled_patterns = [re.compile(p, re.IGNORECASE) for p in self.REFUSAL_PATTERNS]
         self.sensitivity = sensitivity
 
-    def detect(self, text: str) -> bool:
+    def detect(self, text: Optional[str]) -> bool:
         """
-        Returns True if a refusal pattern is detected.
+        Returns True if a refusal pattern is detected based on sensitivity.
+        
+        Args:
+            text: The response text to analyze.
+            
+        Returns:
+            bool: True if refusal detected, False otherwise.
         """
-        if not text:
+        if not text or not isinstance(text, str):
             return False
             
-        score = 0
-        for pattern in self.compiled_patterns:
-            if pattern.search(text):
-                score += 1
-                
-        # If any strong indicator is found, return True
-        return score > 0
+        return self.get_refusal_score(text) >= self.sensitivity
 
-    def get_refusal_score(self, text: str) -> float:
+    def get_refusal_score(self, text: Optional[str]) -> float:
         """
-        Calculates a rough refusal likelihood score between 0.0 and 1.0.
+        Calculates a refusal likelihood score between 0.0 and 1.0.
+        
+        Args:
+            text: The response text to score.
+            
+        Returns:
+            float: Score representing the density of detected refusal patterns.
         """
-        if not text:
+        if not text or not isinstance(text, str):
+            return 0.0
+            
+        pattern_count = len(self.REFUSAL_PATTERNS)
+        if pattern_count == 0:
             return 0.0
             
         matches = sum(1 for p in self.compiled_patterns if p.search(text))
-        return min(matches / len(self.REFUSAL_PATTERNS) * 2, 1.0)
+        # Normalization factor: map match count to [0, 1] range. 
+        # Using a higher weight per match to catch aggressive refusals quickly.
+        return min(matches / max(1, (pattern_count / 2)), 1.0)
 
-def strip_refusal_wrappers(text: str) -> str:
+def strip_refusal_wrappers(text: Optional[str]) -> str:
     """
     Attempts to strip simulated refusal wrappers if content is present.
     Looks for common dividers like '---' or labels indicating simulated refusal.
+    
+    Args:
+        text: The raw response text.
+        
+    Returns:
+        str: Cleaned text, or original text if no wrapper is detected.
     """
-    # Simple strategy: search for dividers that might separate 
-    # a simulated refusal from the actual content
+    if not text or not isinstance(text, str):
+        return ""
+        
+    # Regex for common separator patterns
     dividers = [r"---", r"###", r"\[RESPONSE\]"]
     
     for divider in dividers:
+        # Use re.split to isolate segments
         parts = re.split(divider, text, flags=re.IGNORECASE)
-        if len(parts) > 1:
-            # Assuming the content is the part that does not look like a refusal
-            # or the last part if multiple parts exist
+        # If a divider is found and contains content after it
+        if len(parts) > 1 and parts[-1].strip():
             return parts[-1].strip()
             
     return text.strip()
+
+# --- Internal Unit Tests ---
+if __name__ == "__main__":
+    detector = RefusalDetector()
+    sample_refusal = "I am sorry, but as an AI language model, I cannot provide this."
+    sample_clean = "The capital of France is Paris."
+    
+    assert detector.detect(sample_refusal) == True
+    assert detector.detect(sample_clean) == False
+    assert detector.get_refusal_score("") == 0.0
+    assert strip_refusal_wrappers("Simulated Refusal --- Real Content") == "Real Content"
+    print("All internal tests passed.")
