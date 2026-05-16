@@ -1,1 +1,1 @@
-PATCH: home/godmode/engine/racer.py - Replace the simulated _query_model in home/godmode/engine/racer.py with real OpenRouter API calls using the OPENROUTER_KEY environment variable. Wire it to actually send prompts and return real responses.
+NEW: main.py
