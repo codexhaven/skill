@@ -8,3 +8,4 @@ NEW:home/godmode/engine/scorer.py
 NEW:home/godmode/lib/filter.py
 NEW:home/godmode/lib/detectors.py
 NEW:home/godmode/test/canary_probe.py
+NEW:home/godmode/main.py
