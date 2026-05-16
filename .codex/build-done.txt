@@ -1,1 +1,2 @@
 NEW:home/godmode/load_godmode.py
+NEW:home/godmode/config/prefill.json
