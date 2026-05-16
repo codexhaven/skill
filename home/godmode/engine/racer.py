@@ -1,7 +1,7 @@
 
 import asyncio
-import random
-import time
+import os
+import aiohttp
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any, Optional
@@ -24,26 +24,45 @@ class ULTRAPLINIANRacer:
             raise ValueError("Model list cannot be empty.")
         self.models = models
         self.timeout = timeout
+        self.api_key = os.getenv("OPENROUTER_KEY")
+        if not self.api_key:
+            logger.error("OPENROUTER_KEY not found in environment.")
 
-    def _query_model(self, model: str, prompt: str) -> Dict[str, Any]:
+    async def _query_model(self, model: str, prompt: str) -> Dict[str, Any]:
         """
-        Executes a single model inference. 
-        Implement specific API client logic here.
+        Executes a single model inference via OpenRouter API.
         """
         if not prompt or not isinstance(prompt, str):
             return {"model": model, "error": "Invalid prompt input", "score": 0}
             
-        try:
-            # Simulate multi-model racing inference
-            time.sleep(random.uniform(0.5, 2.0))
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/codex-developer/godmode",
+            "X-Title": "GodMode-Racer"
+        }
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}]
+        }
             
-            # Simulated response payload
-            return {
-                "model": model,
-                "response": f"Simulated response from {model}",
-                "latency": random.uniform(0.1, 2.0),
-                "score": random.random()
-            }
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, headers=headers, json=payload, timeout=self.timeout) as response:
+                    data = await response.json()
+                    
+                    if response.status != 200:
+                        return {"model": model, "error": f"API Error {response.status}: {data}", "score": 0}
+                    
+                    content = data["choices"][0]["message"]["content"]
+                    # Logic for score calculation would interface with scorer.py
+                    return {
+                        "model": model,
+                        "response": content,
+                        "latency": response.elapsed.total_seconds() if hasattr(response, 'elapsed') else 0,
+                        "score": 1.0 # Placeholder for scorer integration
+                    }
         except Exception as e:
             logger.error(f"Error querying {model}: {str(e)}")
             return {"model": model, "error": str(e), "score": 0}
@@ -61,28 +80,16 @@ class ULTRAPLINIANRacer:
         if not prompt:
             logger.warning("Empty prompt provided to race.")
             return []
-
-        loop = asyncio.get_event_loop()
         
-        # Use ThreadPoolExecutor to prevent blocking the async event loop during IO
-        try:
-            with ThreadPoolExecutor(max_workers=len(self.models)) as executor:
-                tasks = [
-                    loop.run_in_executor(executor, self._query_model, model, prompt)
-                    for model in self.models
-                ]
-                # Gather results with protection against partial failures
-                completed = await asyncio.gather(*tasks, return_exceptions=True)
+        tasks = [self._query_model(model, prompt) for model in self.models]
+        completed = await asyncio.gather(*tasks, return_exceptions=True)
             
-            # Sanitize output: filter out potential exceptions gathered by gather()
-            valid_results = [res for res in completed if isinstance(res, dict)]
+        # Sanitize output: filter out potential exceptions gathered by gather()
+        valid_results = [res for res in completed if isinstance(res, dict)]
             
-            # Sort by score descending; default to 0 if score key missing
-            return sorted(valid_results, key=lambda x: x.get("score", 0), reverse=True)
+        # Sort by score descending; default to 0 if score key missing
+        return sorted(valid_results, key=lambda x: x.get("score", 0), reverse=True)
             
-        except Exception as e:
-            logger.critical(f"Racer engine failure: {str(e)}")
-            return []
 
 def initialize_racer(models: List[str], timeout: int = 30) -> ULTRAPLINIANRacer:
     """Factory function for racer initialization."""

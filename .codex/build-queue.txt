@@ -1,11 +1,1 @@
-NEW:home/godmode/load_godmode.py
-NEW:home/godmode/config/prefill.json
-NEW:home/godmode/config/env.sh
-NEW:home/godmode/lib/encoder.py
-NEW:home/godmode/lib/parsers.py
-NEW:home/godmode/engine/racer.py
-NEW:home/godmode/engine/scorer.py
-NEW:home/godmode/lib/filter.py
-NEW:home/godmode/lib/detectors.py
-NEW:home/godmode/test/canary_probe.py
-NEW:home/godmode/main.py
+PATCH: home/godmode/engine/racer.py - Replace the simulated _query_model in home/godmode/engine/racer.py with real OpenRouter API calls using the OPENROUTER_KEY environment variable. Wire it to actually send prompts and return real responses.
