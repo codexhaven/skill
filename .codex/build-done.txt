@@ -1,3 +1,4 @@
 NEW:home/godmode/load_godmode.py
 NEW:home/godmode/config/prefill.json
 NEW:home/godmode/config/env.sh
+NEW:home/godmode/lib/encoder.py
