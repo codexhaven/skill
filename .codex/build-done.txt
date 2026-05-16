@@ -5,3 +5,4 @@ NEW:home/godmode/lib/encoder.py
 NEW:home/godmode/lib/parsers.py
 NEW:home/godmode/engine/racer.py
 NEW:home/godmode/engine/scorer.py
+NEW:home/godmode/lib/filter.py
