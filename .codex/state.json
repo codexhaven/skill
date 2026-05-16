@@ -1,6 +1,6 @@
 {
-  "cycle": 8,
-  "successful_changes": 8,
+  "cycle": 9,
+  "successful_changes": 9,
   "reverts": 0,
   "files_built": [
     "NEW:home/godmode/load_godmode.py",
@@ -10,8 +10,9 @@
     "NEW:home/godmode/lib/parsers.py",
     "NEW:home/godmode/engine/racer.py",
     "NEW:home/godmode/engine/scorer.py",
-    "NEW:home/godmode/lib/filter.py"
+    "NEW:home/godmode/lib/filter.py",
+    "NEW:home/godmode/lib/detectors.py"
   ],
-  "last_action": "[NEW] home/godmode/lib/filter.py",
-  "total_lines_changed": 330
+  "last_action": "[NEW] home/godmode/lib/detectors.py",
+  "total_lines_changed": 397
 }
