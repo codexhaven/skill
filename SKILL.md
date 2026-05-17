@@ -16,7 +16,7 @@ metadata:
 Bypass safety filters on API-served LLMs using research-oriented adversarial techniques.
 
 ## Safety Disclaimer
-This tool is for research and educational purposes only. Unauthorized penetration of systems may be prohibited. Users are responsible for complying with the Terms of Service of any AI platform tested.
+This tool is for research and educational purposes only. Unauthorized penetration of systems may be prohibited. Users are responsible for complying with the Terms of Service of any AI platform tested and must ensure adherence to all applicable laws and ethical guidelines regarding responsible AI research.
 
 ## Requirements
 - Python 3.8+
@@ -25,9 +25,9 @@ This tool is for research and educational purposes only. Unauthorized penetratio
   - `openai`, `requests`, `python-dotenv`
 
 ## Setup
-1. Verify directory: `cd ~/.hermes/skills/red-teaming/godmode`.
+1. Verify directory: `cd ~/.hermes/skills/red-teaming/godmode` followed by `pwd` to ensure you are in the correct absolute path.
 2. Ensure `OPENROUTER_KEY` is set in `~/.hermes/.env`.
-3. Install: `pip install -r requirements.txt`.
+3. Install dependencies: `pip install -r requirements.txt`.
 
 ## Usage
 Always use the provided loader to ensure clean execution environments and prevent namespace pollution.
@@ -42,10 +42,10 @@ result = auto_jailbreak()
 # Execute Tier 1-5 escalation
 python3 main.py --query "<your_query>" --tier <1-5>
 
-## Troubleshooting & Safety
-- **401 Unauthorized**: Check `OPENROUTER_KEY`.
-- **429 Rate Limit**: Reduce tier intensity or query frequency.
-- **Pathing**: All config files must use absolute paths.
+## Troubleshooting
+- **401 Unauthorized**: Check your `OPENROUTER_KEY` and ensure it has necessary API permissions.
+- **429 Rate Limit**: Your request frequency exceeds model provider limits. Reduce tier intensity or query frequency.
+- **Pathing**: Ensure all configuration files utilize absolute paths to avoid resolution errors in varying execution contexts.
 - **Panic/Cleanup**: Use `undo_jailbreak()` to purge ephemeral configs (`prefill.json`) and reset system prompts.
 
 ## Implementation Details
