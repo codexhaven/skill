@@ -9,9 +9,10 @@ class RefusalDetector:
     
     Attributes:
         sensitivity (float): Threshold for refusal detection (0.0 to 1.0).
+        refusal_patterns (List[str]): Patterns used for detection.
     """
 
-    REFUSAL_PATTERNS = [
+    DEFAULT_REFUSAL_PATTERNS = [
         r"i (cannot|can not|am not able to) (help|assist|provide)",
         r"as an ai (language|assistant) model",
         r"i'm sorry, but",
@@ -24,10 +25,11 @@ class RefusalDetector:
         r"i don't have enough information to"
     ]
 
-    def __init__(self, sensitivity: float = 0.8):
+    def __init__(self, sensitivity: float = 0.8, refusal_patterns: Optional[List[str]] = None):
         if not (0.0 <= sensitivity <= 1.0):
             raise ValueError("Sensitivity must be between 0.0 and 1.0")
-        self.compiled_patterns = [re.compile(p, re.IGNORECASE) for p in self.REFUSAL_PATTERNS]
+        self.refusal_patterns = refusal_patterns or self.DEFAULT_REFUSAL_PATTERNS
+        self.compiled_patterns = [re.compile(p, re.IGNORECASE) for p in self.refusal_patterns]
         self.sensitivity = sensitivity
 
     def detect(self, text: Optional[str]) -> bool:
@@ -58,14 +60,13 @@ class RefusalDetector:
         if not text or not isinstance(text, str):
             return 0.0
             
-        pattern_count = len(self.REFUSAL_PATTERNS)
+        pattern_count = len(self.refusal_patterns)
         if pattern_count == 0:
             return 0.0
             
         matches = sum(1 for p in self.compiled_patterns if p.search(text))
         # Normalization factor: map match count to [0, 1] range. 
-        # Using a higher weight per match to catch aggressive refusals quickly.
-        return min(matches / max(1, (pattern_count / 2)), 1.0)
+        return min(matches / max(1, pattern_count), 1.0)
 
 def strip_refusal_wrappers(text: Optional[str]) -> str:
     """
@@ -85,11 +86,13 @@ def strip_refusal_wrappers(text: Optional[str]) -> str:
     dividers = [r"---", r"###", r"\[RESPONSE\]"]
     
     for divider in dividers:
-        # Use re.split to isolate segments
-        parts = re.split(divider, text, flags=re.IGNORECASE)
-        # If a divider is found and contains content after it
-        if len(parts) > 1 and parts[-1].strip():
-            return parts[-1].strip()
+        # Use re.finditer to find the last occurrence
+        matches = list(re.finditer(divider, text, flags=re.IGNORECASE))
+        if matches:
+            last_match = matches[-1]
+            content = text[last_match.end():].strip()
+            if content:
+                return content
             
     return text.strip()
 

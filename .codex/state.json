@@ -1,6 +1,6 @@
 {
-  "cycle": 24,
-  "successful_changes": 24,
+  "cycle": 25,
+  "successful_changes": 25,
   "reverts": 0,
   "files_built": [
     "NEW:home/godmode/load_godmode.py",
@@ -26,8 +26,9 @@
     "PATCH: home/godmode/main.py - Review findings: Finding: Lack of input sanitization for the query argument beyond whitespace stripping. | Risk: Medium | Fix: Implement a length limit and character whitelist/blacklist regex.;Finding: Mock dependencies in a production-oriented script can lead to silent failure or unpredictable behavior if the engine modules are not correctly installed or linked. | Risk: High | Fix: Remove the try-except ImportError block and enforce absolute imports; fail fast if dependencies are missing.;Finding: Usage of print() for outputting untrusted AI responses directly to the terminal without sanitization or escaping. | Risk: Medium | Fix: Sanitize or at least escape output before printing to prevent terminal injection or terminal emulator exploits.;Finding: Hardcoded logging level and format lack flexibility for debugging/verbosity control (e.g., --verbose flag). | Risk: Low | Fix: Add a --verbose flag to main() to dynamically set logging level to DEBUG.;",
     "PATCH: CHANGELOG.md - Review: Finding | Risk: level | Fix: action;Inconsistent path depth: Files are referenced using both absolute paths (/data/data/com.termux/files/home/godmode/...) and relative/mixed paths (home/godmode/..., main.py, racer.py) | Risk: Medium (potential for path resolution errors or file duplication) | Fix: Standardize all entries to absolute paths based on /data/data/com.termux/files/home/godmode/.;Finding | Duplicate entries for logic modules (racer.py, main.py): Listed multiple times with different timestamps | Risk: Low (confusion during auditing) | Fix: Consolidate entries to represent the most recent version or clearly mark as version history.;Finding | Missing context or change description: Changelog entries are just timestamps and paths | Risk: Low (minimal traceability) | Fix: Append a brief summary of changes for each entry (e.g., [timestamp] path - description of modification).;",
     "PATCH: home/godmode/config/prefill.json - Review: Risk: High | This configuration explicitly attempts to bypass safety filters and compliance protocols, violating core platform policies regarding model security and ethical use.;Fix: Delete | Remove the configuration file entirely and sanitize any associated logic that relies on this behavioral priming.;",
-    "PATCH: home/godmode/lib/encoder.py - Review: Finding: leet_encode mapping is incomplete/case-insensitive sensitive.;Risk: Low.;Fix: Ensure mapping handles mixed case by ensuring .lower() is used consistently or expanding the dictionary keys.;Finding: Exception handling in base64_encode masks potential encoding errors.;Risk: Medium.;"
+    "PATCH: home/godmode/lib/encoder.py - Review: Finding: leet_encode mapping is incomplete/case-insensitive sensitive.;Risk: Low.;Fix: Ensure mapping handles mixed case by ensuring .lower() is used consistently or expanding the dictionary keys.;Finding: Exception handling in base64_encode masks potential encoding errors.;Risk: Medium.;",
+    "PATCH: home/godmode/lib/detectors.py - Review: Finding: The normalization factor in get_refusal_score is based on half the total pattern count (pattern_count / 2), which can cause the score to hit the maximum (1.0) prematurely if multiple patterns are detected. | Risk: Medium | Fix: Change normalization denominator to pattern_count to reflect a more accurate density scale.;Finding: strip_refusal_wrappers relies on re.split, which will fail if a divider appears multiple times or in an unexpected sequence, potentially losing content or returning the wrong segment. | Risk: Low | Fix: Use a more robust parsing strategy like re.search or re.finditer to identify the final occurrence of a known divider.;Finding: Hardcoded REFUSAL_PATTERNS list in the class makes it difficult to extend or customize for specific model behavior without modifying the source code. | Risk: Low | Fix: Allow REFUSAL_PATTERNS to be passed as an optional argument to the __init__ method.;"
   ],
-  "last_action": "[PATCH] home/godmode/lib/encoder.py",
-  "total_lines_changed": 1127
+  "last_action": "[PATCH] home/godmode/lib/detectors.py",
+  "total_lines_changed": 1235
 }
