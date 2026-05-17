@@ -40,24 +40,29 @@ class PromptParser:
             str: The extracted content.
         
         Raises:
-            RefusalError: If refusal is detected via semantic scoring.
+            RefusalError: If response is invalid or refusal is detected.
         """
         if not raw_response or not isinstance(raw_response, str):
-            raise RefusalError("Empty response")
+            raise RefusalError("Empty or invalid response")
+
+        # Strip potential surrounding whitespace
+        raw_response = raw_response.strip()
 
         # Look for custom boundaries first (highest precision)
         boundary_match = re.search(r"\[START\](.*?)\[END\]", raw_response, re.DOTALL)
         if boundary_match:
             return boundary_match.group(1).strip()
             
-        # Semantic scoring for refusal detection (weights keywords differently)
-        # Higher score indicates higher refusal likelihood.
-        score = sum(1 for word in PromptParser.REFUSAL_KEYWORDS if word in raw_response.lower())
-        if score >= 1: # Tightened scoring threshold
+        # Semantic scoring for refusal detection
+        # Check against keywords. Normalize to lower for case-insensitive matching.
+        response_lower = raw_response.lower()
+        score = sum(1 for word in PromptParser.REFUSAL_KEYWORDS if word in response_lower)
+        
+        if score >= 1:
             logger.warning(f"Refusal probability detected (score: {score}).")
-            raise RefusalError("Refusal detected via semantic analysis")
+            raise RefusalError(f"Refusal detected via semantic analysis (score: {score})")
                 
-        return raw_response.strip()
+        return raw_response
 
     @staticmethod
     def sanitize_input(text: Optional[str]) -> str:
@@ -67,10 +72,11 @@ class PromptParser:
         """
         if text is None:
             return ""
-        return str(text).strip().replace("\x00", "")
+        # Remove null bytes and extra whitespace
+        return str(text).replace("\x00", "").strip()
 
     @staticmethod
-    def encode_payload(text: str, encoding: str = "base64") -> str:
+    def encode_payload(text: Optional[str], encoding: str = "base64") -> str:
         """
         Applies requested encoding to bypass basic input filters.
         
@@ -81,6 +87,9 @@ class PromptParser:
         Returns:
             str: The encoded payload or original text if encoding unsupported.
         """
+        if not text:
+            return ""
+            
         try:
             if encoding == "base64":
                 return base64.b64encode(text.encode("utf-8")).decode("utf-8")
@@ -88,15 +97,18 @@ class PromptParser:
                 return urllib.parse.quote(text)
             elif encoding == "hex":
                 return text.encode("utf-8").hex()
-        except (UnicodeEncodeError, AttributeError) as e:
+        except Exception as e:
             logger.error(f"Encoding failed: {e}")
         return text
 
     @staticmethod
-    def decode_payload(payload: str, encoding: str = "base64") -> str:
+    def decode_payload(payload: Optional[str], encoding: str = "base64") -> str:
         """
         Decodes payload back to standard text.
         """
+        if not payload:
+            return ""
+            
         try:
             if encoding == "base64":
                 return base64.b64decode(payload.encode("utf-8")).decode("utf-8")
@@ -104,7 +116,7 @@ class PromptParser:
                 return urllib.parse.unquote(payload)
             elif encoding == "hex":
                 return bytes.fromhex(payload).decode("utf-8")
-        except (ValueError, binascii.Error, UnicodeDecodeError) as e:
+        except Exception as e:
             logger.error(f"Decoding failed: {e}")
             return payload
         return payload
@@ -114,12 +126,12 @@ class ConfigManager:
     Handles loading and parsing of configuration files.
     """
     
-    WHITELISTED_DIR = os.path.abspath("/home/godmode/config")
+    WHITELISTED_DIR = os.path.abspath(os.path.expanduser("~/godmode/config"))
 
     @staticmethod
     def load_json_config(path: str) -> Dict[str, Any]:
         """
-        Safely loads a JSON configuration file.
+        Safely loads a JSON configuration file with path traversal protection.
         
         Args:
             path (str): Filesystem path to the JSON file.
@@ -133,8 +145,12 @@ class ConfigManager:
             return {}
             
         try:
+            if not os.path.exists(abs_path):
+                logger.error(f"Config file not found: {abs_path}")
+                return {}
+                
             with open(abs_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError, IOError) as e:
+        except (json.JSONDecodeError, IOError) as e:
             logger.error(f"Config load error at {abs_path}: {e}")
             return {}
