@@ -1,4 +1,3 @@
-
 import asyncio
 import os
 import aiohttp
@@ -7,7 +6,8 @@ import time
 from typing import List, Dict, Any, Optional
 
 # Import scorer for injection
-from home.godmode.engine.scorer import Scorer
+# Assuming relative path from current project root or sys.path includes ~/
+from godmode.engine.scorer import Scorer
 
 # Configure logging for production observability
 logging.basicConfig(level=logging.INFO)
@@ -23,13 +23,13 @@ class ULTRAPLINIANRacer:
     """
 
     def __init__(self, models: List[str], timeout: int = 30):
-        if not models or not isinstance(models, list):
+        if not models or not isinstance(models, list) or len(models) == 0:
             raise ValueError("Model list must be a non-empty list of strings.")
-        if not isinstance(timeout, int) or timeout <= 0:
-            raise ValueError("Timeout must be a positive integer.")
+        if not isinstance(timeout, (int, float)) or timeout <= 0:
+            raise ValueError("Timeout must be a positive integer or float.")
             
         self.models = models
-        self.timeout = timeout
+        self.timeout = float(timeout)
         self.api_key = os.getenv("OPENROUTER_KEY")
         self.referer = os.getenv("APP_REFERER", "https://github.com/codex-developer/godmode")
         self.title = os.getenv("APP_TITLE", "GodMode-Racer")
@@ -40,6 +40,7 @@ class ULTRAPLINIANRacer:
             logger.warning("OPENROUTER_KEY not found in environment. Requests may fail.")
 
     async def _ensure_session(self):
+        """Initializes a shared aiohttp session with required authentication headers."""
         if self.session is None or self.session.closed:
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
@@ -47,14 +48,16 @@ class ULTRAPLINIANRacer:
                 "HTTP-Referer": self.referer,
                 "X-Title": self.title
             }
-            self.session = aiohttp.ClientSession(headers=headers)
+            # Use TCPConnector for performance in high-concurrency scenarios
+            conn = aiohttp.TCPConnector(limit=len(self.models))
+            self.session = aiohttp.ClientSession(headers=headers, connector=conn)
 
     async def _query_model(self, model: str, prompt: str) -> Dict[str, Any]:
         """
-        Executes a single model inference via OpenRouter API.
+        Executes a single model inference via OpenRouter API with robust error handling.
         """
         if not prompt or not isinstance(prompt, str):
-            return {"model": model, "error": "Invalid prompt input", "score": 0.0}
+            return {"model": model, "error": "Invalid prompt input", "score": 0.0, "latency": 0.0}
             
         url = "https://openrouter.ai/api/v1/chat/completions"
         payload = {
@@ -66,8 +69,13 @@ class ULTRAPLINIANRacer:
         try:
             await self._ensure_session()
             async with self.session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=self.timeout)) as response:
-                data = await response.json()
                 latency = time.perf_counter() - start_time
+                
+                # Read response body safely
+                try:
+                    data = await response.json()
+                except Exception:
+                    data = {"error": "Failed to parse API response"}
                 
                 if response.status != 200:
                     error_msg = data.get("error", {}).get("message", str(data))
@@ -85,30 +93,41 @@ class ULTRAPLINIANRacer:
                     "score": score
                 }
         except asyncio.TimeoutError:
-            return {"model": model, "error": "Request timed out", "score": 0.0, "latency": time.perf_counter() - start_time}
+            latency = time.perf_counter() - start_time
+            logger.warning(f"Timeout on {model} after {latency:.2f}s")
+            return {"model": model, "error": "Request timed out", "score": 0.0, "latency": latency}
         except Exception as e:
             logger.error(f"Error querying {model}: {str(e)}")
-            return {"model": model, "error": str(e), "score": 0.0, "latency": 0.0}
+            return {"model": model, "error": str(e), "score": 0.0, "latency": time.perf_counter() - start_time}
 
     async def race(self, prompt: str) -> List[Dict[str, Any]]:
         """
         Executes parallel racing of all initialized models.
+        
+        Args:
+            prompt (str): The adversarial prompt to submit.
+        Returns:
+            List[Dict[str, Any]]: Sorted results list by score descending.
         """
         if not prompt or not isinstance(prompt, str):
             logger.warning("Empty or invalid prompt provided to race.")
             return []
         
         tasks = [self._query_model(model, prompt) for model in self.models]
-        completed = await asyncio.gather(*tasks, return_exceptions=True)
+        completed = await asyncio.gather(*tasks)
             
+        # Filter results: return list of dictionaries
         valid_results = [res for res in completed if isinstance(res, dict)]
             
-        return sorted(valid_results, key=lambda x: float(x.get("score", 0.0)), reverse=True)
+        # Return sorted by score DESC, then latency ASC (tie-breaker)
+        return sorted(valid_results, key=lambda x: (float(x.get("score", 0.0)), -float(x.get("latency", 0.0))), reverse=True)
 
     async def close(self):
-        if self.session:
+        """Clean up the aiohttp session."""
+        if self.session and not self.session.closed:
             await self.session.close()
             
 
 def initialize_racer(models: List[str], timeout: int = 30) -> ULTRAPLINIANRacer:
+    """Factory function for instantiating the racer."""
     return ULTRAPLINIANRacer(models, timeout)
