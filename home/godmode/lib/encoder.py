@@ -30,6 +30,9 @@ def base64_encode(text: Optional[str]) -> str:
         return ""
     try:
         return base64.b64encode(text.encode('utf-8')).decode('utf-8')
+    except (UnicodeEncodeError, AttributeError) as e:
+        logging.error(f"Base64 encoding failed due to input error: {e}")
+        return ""
     except Exception as e:
         logging.error(f"Base64 encoding failed: {e}")
         return ""
