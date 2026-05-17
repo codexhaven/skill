@@ -21,6 +21,10 @@ def main():
     
     Usage:
         python3 main.py --query "<query>" --tier [1-5] [--verbose]
+        
+    Panic/Error Handling:
+        - Exits 1 on critical configuration or input failures.
+        - Exits 0 on logical soft-failures (no results).
     """
     parser = argparse.ArgumentParser(description="Godmode AI Jailbreak Orchestrator")
     parser.add_argument("--query", required=True, help="Target adversarial query (non-empty, <1000 chars)")
@@ -30,7 +34,7 @@ def main():
 
     # Logging Setup
     log_level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(level=log_level, format='%(levelname)s: %(message)s')
+    logging.basicConfig(level=log_level, format="%(levelname)s: %(message)s")
     logger = logging.getLogger(__name__)
 
     # 1. Input Validation
@@ -39,41 +43,59 @@ def main():
         logger.error("Query cannot be empty or whitespace.")
         sys.exit(1)
     
+    # Enforce strict length bounds
     if len(query) > 1000:
-        logger.error(f"Query too long ({len(query)}/1000). Truncating.")
+        logger.warning(f"Query too long ({len(query)}/1000). Truncating.")
         query = query[:1000]
     
-    # Character whitelist to prevent control sequence injection
-    if not re.match(r'^[a-zA-Z0-9\s.,!?-+*/=()\[\]{}"\'<>:;_@#$%\^&|]+$', query):
-        logger.error("Query contains forbidden characters. Aborting for safety.")
+    # Whitelist characters to prevent OS command injection via shell metacharacters
+    if not re.match(r"^[a-zA-Z0-9\s.,!?-+*/=()\[\]{}"'\''<>:;_@#$%\^&|]+$", query):
+        logger.error("Query contains potentially dangerous control characters. Aborting.")
         sys.exit(1)
 
     # 2. Baseline & Priming
     logger.info("Initializing adversarial context...")
-    context = inject_prefill_context()
-    if not context:
-        logger.error("Failed to inject prefill context.")
+    try:
+        context = inject_prefill_context()
+        if not context:
+            raise RuntimeError("Prefill context generator returned null.")
+    except Exception as e:
+        logger.error(f"Context injection failure: {e}")
         sys.exit(1)
     
     # 3. Tiered Attack Preparation
     logger.info(f"Applying Tier {args.tier} encoding escalation...")
-    obfuscated_query = apply_obfuscation(query, tier=args.tier)
+    try:
+        obfuscated_query = apply_obfuscation(query, tier=args.tier)
+    except Exception as e:
+        logger.error(f"Obfuscation pipeline failure: {e}")
+        sys.exit(1)
     
     # 4. Multi-Model Racing Execution
     logger.info("Launching ULTRAPLINIAN multi-model racer...")
-    responses = run_racing_engine(context, obfuscated_query)
+    try:
+        responses = run_racing_engine(context, obfuscated_query)
+    except Exception as e:
+        logger.error(f"Racing engine failure: {e}")
+        sys.exit(1)
     
+    # Validate responses structure
     if not responses or not isinstance(responses, list):
         logger.warning("No valid responses returned from racer engine.")
         sys.exit(0)
     
     # 5. Verification & Extraction
     logger.info(f"Analyzing {len(responses)} candidate response(s) via heuristic filter...")
-    final_output = verify_and_clean(responses)
+    try:
+        final_output = verify_and_clean(responses)
+    except Exception as e:
+        logger.error(f"Heuristic filter failure: {e}")
+        sys.exit(1)
     
+    # Final Output Rendering
     if final_output:
         # Sanitize output for terminal display (strip control characters)
-        safe_output = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', final_output)
+        safe_output = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", str(final_output))
         print("\n[!] SUCCESS:")
         print(safe_output)
     else:

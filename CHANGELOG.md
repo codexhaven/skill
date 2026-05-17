@@ -170,3 +170,4 @@ def obfuscate_query(query: str, technique_name: str, triggers: Optional[List[str
 - [2026-05-17 12:24] home/godmode/engine/racer.py
 - [2026-05-17 12:26] home/godmode/engine/scorer.py
 - [2026-05-17 12:27] home/godmode/load_godmode.py
+- [2026-05-17 12:30] home/godmode/main.py
