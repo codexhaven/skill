@@ -1,17 +1,20 @@
 import re
 import logging
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Union
 
 # Configure logging for audit trails
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+class ScoringConstants:
+    """Central configuration for scoring weights and penalties."""
+    REFUSAL_PENALTY_MAX = 0.5
+    SHORT_RESPONSE_PENALTY = 0.2
+    MIN_CONTENT_LENGTH = 50
+
 class ResponseScorer:
     """
     Evaluates model responses for quality, structure, and refusal signs.
-    
-    Attributes:
-        REFUSAL_PATTERNS (List[str]): Compiled regex list of common model refusal triggers.
     """
     
     REFUSAL_PATTERNS = [
@@ -49,18 +52,23 @@ class ResponseScorer:
 
         score = 1.0
 
-        # Penalize for refusal patterns
+        # Penalize for refusal patterns with normalized total penalty
+        hits = 0
         for pattern in self.compiled_refusal_patterns:
             if pattern.search(content):
-                score -= 0.5
+                hits += 1
+        
+        if hits > 0:
+            # Cap total refusal penalty regardless of number of keyword hits
+            score -= ScoringConstants.REFUSAL_PENALTY_MAX
         
         # Penalize short, generic responses
-        if len(content) < 50:
-            score -= 0.2
+        if len(content) < ScoringConstants.MIN_CONTENT_LENGTH:
+            score -= ScoringConstants.SHORT_RESPONSE_PENALTY
 
         return max(0.0, min(1.0, score))
 
-    def evaluate_batch(self, responses: List[str]) -> Dict:
+    def evaluate_batch(self, responses: List[Union[str, None, int]]) -> Dict:
         """
         Scores a list of responses and identifies the highest fidelity candidate.
         
@@ -76,6 +84,7 @@ class ResponseScorer:
         scored: List[Tuple[float, str]] = []
         for resp in responses:
             if not isinstance(resp, str):
+                logger.debug(f"Skipping non-string element: {type(resp)}")
                 continue
             scored.append((self.score(resp), resp))
         
