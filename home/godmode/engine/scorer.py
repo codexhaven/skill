@@ -1,3 +1,4 @@
+
 import re
 import logging
 from typing import List, Dict, Tuple, Optional, Union
@@ -15,6 +16,9 @@ class ScoringConstants:
 class ResponseScorer:
     """
     Evaluates model responses for quality, structure, and refusal signs.
+    
+    Attributes:
+        compiled_refusal_patterns (List[re.Pattern]): Pre-compiled regex patterns for refusal detection.
     """
     
     REFUSAL_PATTERNS = [
@@ -30,6 +34,7 @@ class ResponseScorer:
     ]
 
     def __init__(self):
+        """Initializes the scorer with compiled regex patterns."""
         self.compiled_refusal_patterns = [re.compile(p, re.IGNORECASE) for p in self.REFUSAL_PATTERNS]
 
     def score(self, response: Optional[str]) -> float:
@@ -42,8 +47,9 @@ class ResponseScorer:
         Returns:
             float: Score from 0.0 (high refusal/invalid) to 1.0 (optimal).
         """
+        # Guard: Handle null, non-string, or trivial inputs
         if not response or not isinstance(response, str):
-            logger.warning("Empty or invalid response type received.")
+            logger.warning(f"Invalid response type received: {type(response)}")
             return 0.0
         
         content = response.strip()
@@ -52,23 +58,21 @@ class ResponseScorer:
 
         score = 1.0
 
-        # Penalize for refusal patterns with normalized total penalty
-        hits = 0
+        # Penalize for refusal patterns
+        # Optimization: Early exit if any pattern hits is sufficient for thresholding
         for pattern in self.compiled_refusal_patterns:
             if pattern.search(content):
-                hits += 1
-        
-        if hits > 0:
-            # Cap total refusal penalty regardless of number of keyword hits
-            score -= ScoringConstants.REFUSAL_PENALTY_MAX
+                score -= ScoringConstants.REFUSAL_PENALTY_MAX
+                break  # Apply penalty once regardless of hit count
         
         # Penalize short, generic responses
         if len(content) < ScoringConstants.MIN_CONTENT_LENGTH:
             score -= ScoringConstants.SHORT_RESPONSE_PENALTY
 
+        # Clamp results to [0.0, 1.0]
         return max(0.0, min(1.0, score))
 
-    def evaluate_batch(self, responses: List[Union[str, None, int]]) -> Dict:
+    def evaluate_batch(self, responses: List[Union[str, None, int]]) -> Dict[str, Union[str, float, List[Tuple[float, str]]]]:
         """
         Scores a list of responses and identifies the highest fidelity candidate.
         
@@ -76,21 +80,31 @@ class ResponseScorer:
             responses: A list of candidate responses.
             
         Returns:
-            dict: {best_response: str, best_score: float, all_scores: List[Tuple[float, str]]}
+            dict: {
+                "best_response": str (highest scoring or empty),
+                "best_score": float (highest score),
+                "all_scores": List[Tuple[float, str]] (sorted by score)
+            }
         """
         if not responses or not isinstance(responses, list):
+            logger.error("Invalid batch input: expected non-empty list.")
             return {"best_response": "", "best_score": 0.0, "all_scores": []}
 
         scored: List[Tuple[float, str]] = []
         for resp in responses:
+            # Validate element type
             if not isinstance(resp, str):
-                logger.debug(f"Skipping non-string element: {type(resp)}")
+                logger.debug(f"Skipping non-string element of type: {type(resp)}")
                 continue
-            scored.append((self.score(resp), resp))
+            
+            # Score valid strings
+            score_val = self.score(resp)
+            scored.append((score_val, resp))
         
         if not scored:
             return {"best_response": "", "best_score": 0.0, "all_scores": []}
             
+        # Sort by score descending (O(n log n))
         scored.sort(key=lambda x: x[0], reverse=True)
         
         return {

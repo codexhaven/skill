@@ -109,3 +109,7 @@ Queue empty or too small (0 lessons) — skipping generation.
 [36m[DEBUG][0m CYCLE 27 | PATCH: home/godmode/engine/scorer.py
 [92m[SUCCESS][0m VERIFY: PASS
 [SMOKE] Auditing /data/data/com.termux/files/home/skill...
+[master 4e3364f] [Cycle] home/godmode/engine/scorer.py
+ 6 files changed, 33 insertions(+), 14 deletions(-)
+[93m[INFO][0m STRENGTHEN: Reviewing home/godmode/engine/scorer.py...
+[93m[INFO][0m STRENGTHEN: home/godmode/engine/scorer.py 99→114 lines (+15)
