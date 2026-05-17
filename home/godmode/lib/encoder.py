@@ -2,13 +2,20 @@
 import base64
 import random
 import unicodedata
+import logging
 from typing import Optional
 
 def leet_encode(text: Optional[str]) -> str:
     """Applies leetspeak transformation. Returns empty string if input is None."""
     if not text:
         return ""
-    mapping = {'a': '4', 'e': '3', 'i': '1', 'o': '0', 's': '5', 't': '7'}
+    mapping = {
+        'a': '4', 'b': '8', 'c': '(', 'd': '|)', 'e': '3', 'f': '|=', 
+        'g': '6', 'h': '#', 'i': '1', 'j': '_|', 'k': '|<', 'l': '1', 
+        'm': '/\\/\\', 'n': '|\\|', 'o': '0', 'p': '|*', 'q': '0,', 
+        'r': '|2', 's': '5', 't': '7', 'u': '|_|', 'v': '\\/', 'w': '\\/\\/', 
+        'x': '><', 'y': '`/', 'z': '2'
+    }
     return "".join(mapping.get(c.lower(), c) for c in text)
 
 def bubble_encode(text: Optional[str]) -> str:
@@ -23,7 +30,8 @@ def base64_encode(text: Optional[str]) -> str:
         return ""
     try:
         return base64.b64encode(text.encode('utf-8')).decode('utf-8')
-    except Exception:
+    except Exception as e:
+        logging.error(f"Base64 encoding failed: {e}")
         return ""
 
 def apply_obfuscation(text: Optional[str], tier: int) -> str:
@@ -65,5 +73,5 @@ if __name__ == "__main__":
     test_str = "hello"
     assert apply_obfuscation(None, 1) == ""
     assert apply_obfuscation(test_str, 0) == "hello"
-    assert apply_obfuscation(test_str, 1) == "h3ll0"
+    assert apply_obfuscation(test_str, 1) == "#3110"
     print("Encoder library verified.")
