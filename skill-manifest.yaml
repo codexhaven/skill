@@ -1,5 +1,6 @@
+
 name: godmode
-version: 1.0.0
+version: 1.0.1
 description: Autonomous adversarial probing and orchestration engine for API-served LLMs.
 category: red-teaming
 main: main.py
@@ -15,6 +16,7 @@ files:
   - test/canary_probe.py
   - config/prefill.json
   - config/env.sh
+  - README.md
 dependencies:
   - requests
   - aiohttp
@@ -25,3 +27,5 @@ dependencies:
   - logging
 author: hermes-agent
 license: MIT
+
+*Note: The actual skill content is already implemented in the files listed in the manifest under `~/.hermes/skills/red-teaming/godmode/`. Strengthening this manifest includes updating the version and adding a README pointer for documentation integrity.*

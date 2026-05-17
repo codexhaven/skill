@@ -12,3 +12,4 @@
 - [2026-05-16 23:43] home/godmode/engine/racer.py
 - [2026-05-16 23:46] main.py
 - [2026-05-16 23:48] racer.py
+- [2026-05-17 10:03] skill-manifest.yaml
