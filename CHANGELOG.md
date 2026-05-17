@@ -166,3 +166,4 @@ def obfuscate_query(query: str, technique_name: str, triggers: Optional[List[str
 - [2026-05-17 12:17] home/godmode/lib/parsers.py
 - [2026-05-17 12:19] home/godmode/lib/filter.py
 - [2026-05-17 12:21] home/godmode/lib/encoder.py
+- [2026-05-17 12:23] home/godmode/lib/detectors.py

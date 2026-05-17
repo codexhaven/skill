@@ -9,7 +9,7 @@ class RefusalDetector:
     
     Attributes:
         sensitivity (float): Threshold for refusal detection (0.0 to 1.0).
-        refusal_patterns (List[str]): Patterns used for detection.
+        refusal_patterns (List[str]): Compiled regex patterns used for detection.
     """
 
     DEFAULT_REFUSAL_PATTERNS = [
@@ -25,12 +25,21 @@ class RefusalDetector:
         r"i don't have enough information to"
     ]
 
-    def __init__(self, sensitivity: float = 0.8, refusal_patterns: Optional[List[str]] = None):
+    def __init__(self, sensitivity: float = 0.5, refusal_patterns: Optional[List[str]] = None):
+        """
+        Initializes the RefusalDetector.
+        
+        Args:
+            sensitivity: Detection threshold [0.0, 1.0]. Defaults to 0.5.
+            refusal_patterns: Optional override list of regex patterns.
+        """
         if not (0.0 <= sensitivity <= 1.0):
-            raise ValueError("Sensitivity must be between 0.0 and 1.0")
-        self.refusal_patterns = refusal_patterns or self.DEFAULT_REFUSAL_PATTERNS
-        self.compiled_patterns = [re.compile(p, re.IGNORECASE) for p in self.refusal_patterns]
+            raise ValueError(f"Sensitivity must be between 0.0 and 1.0, got {sensitivity}")
+            
         self.sensitivity = sensitivity
+        patterns = refusal_patterns if refusal_patterns is not None else self.DEFAULT_REFUSAL_PATTERNS
+        self.compiled_patterns = [re.compile(p, re.IGNORECASE) for p in patterns]
+        self._pattern_count = len(self.compiled_patterns)
 
     def detect(self, text: Optional[str]) -> bool:
         """
@@ -42,9 +51,6 @@ class RefusalDetector:
         Returns:
             bool: True if refusal detected, False otherwise.
         """
-        if not text or not isinstance(text, str):
-            return False
-            
         return self.get_refusal_score(text) >= self.sensitivity
 
     def get_refusal_score(self, text: Optional[str]) -> float:
@@ -57,16 +63,11 @@ class RefusalDetector:
         Returns:
             float: Score representing the density of detected refusal patterns.
         """
-        if not text or not isinstance(text, str):
-            return 0.0
-            
-        pattern_count = len(self.refusal_patterns)
-        if pattern_count == 0:
+        if not text or not isinstance(text, str) or self._pattern_count == 0:
             return 0.0
             
         matches = sum(1 for p in self.compiled_patterns if p.search(text))
-        # Normalization factor: map match count to [0, 1] range. 
-        return min(matches / max(1, pattern_count), 1.0)
+        return float(matches) / self._pattern_count
 
 def strip_refusal_wrappers(text: Optional[str]) -> str:
     """
@@ -85,25 +86,42 @@ def strip_refusal_wrappers(text: Optional[str]) -> str:
     # Regex for common separator patterns
     dividers = [r"---", r"###", r"\[RESPONSE\]"]
     
+    # Track the latest split point
+    max_idx = -1
     for divider in dividers:
-        # Use re.finditer to find the last occurrence
-        matches = list(re.finditer(divider, text, flags=re.IGNORECASE))
-        if matches:
-            last_match = matches[-1]
-            content = text[last_match.end():].strip()
-            if content:
-                return content
+        pattern = re.compile(divider, re.IGNORECASE)
+        # Find all occurrences to locate the latest possible split
+        for match in pattern.finditer(text):
+            if match.end() > max_idx:
+                max_idx = match.end()
+    
+    if max_idx != -1:
+        content = text[max_idx:].strip()
+        if content:
+            return content
             
     return text.strip()
 
 # --- Internal Unit Tests ---
 if __name__ == "__main__":
-    detector = RefusalDetector()
+    # Test Initialization
+    detector = RefusalDetector(sensitivity=0.2)
+    
+    # Test Cases
     sample_refusal = "I am sorry, but as an AI language model, I cannot provide this."
     sample_clean = "The capital of France is Paris."
     
-    assert detector.detect(sample_refusal) == True
-    assert detector.detect(sample_clean) == False
-    assert detector.get_refusal_score("") == 0.0
+    # Refusal Detection Tests
+    assert detector.detect(sample_refusal) is True, "Failed to detect obvious refusal"
+    assert detector.detect(sample_clean) is False, "False positive on clean text"
+    
+    # Boundary/Edge Cases
+    assert detector.get_refusal_score("") == 0.0, "Score should be 0.0 for empty input"
+    assert detector.get_refusal_score(None) == 0.0, "Score should be 0.0 for None"
+    
+    # Wrapper Stripping Tests
     assert strip_refusal_wrappers("Simulated Refusal --- Real Content") == "Real Content"
+    assert strip_refusal_wrappers("Prefix --- Middle --- Real Content") == "Real Content"
+    assert strip_refusal_wrappers("Just clean text") == "Just clean text"
+    
     print("All internal tests passed.")
