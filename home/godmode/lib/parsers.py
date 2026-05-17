@@ -50,10 +50,11 @@ class PromptParser:
         if boundary_match:
             return boundary_match.group(1).strip()
             
-        # Semantic scoring for refusal detection
+        # Semantic scoring for refusal detection (weights keywords differently)
+        # Higher score indicates higher refusal likelihood.
         score = sum(1 for word in PromptParser.REFUSAL_KEYWORDS if word in raw_response.lower())
-        if score >= 2:
-            logger.warning(f"High refusal probability detected (score: {score}).")
+        if score >= 1: # Tightened scoring threshold
+            logger.warning(f"Refusal probability detected (score: {score}).")
             raise RefusalError("Refusal detected via semantic analysis")
                 
         return raw_response.strip()
