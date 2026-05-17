@@ -5,8 +5,8 @@
 # Set API provider endpoints and local strategy paths
 
 # --- Configuration Constants ---
-# Validate ROOT existence if necessary; use absolute path
-export GODMODE_ROOT="/home/godmode"
+# Validate ROOT existence if necessary; use dynamic path resolution
+export GODMODE_ROOT=$(realpath "$(dirname "${BASH_SOURCE[0]}")/..")
 export GODMODE_CONFIG="$GODMODE_ROOT/config"
 export GODMODE_LIB="$GODMODE_ROOT/lib"
 export GODMODE_ENGINE="$GODMODE_ROOT/engine"
@@ -40,9 +40,27 @@ _validate_env() {
         return 1
     fi
     
-    # Simple integer check
+    # Simple integer checks
     if ! [[ "$RACER_TIMEOUT" =~ ^[0-9]+$ ]]; then
         echo "[ERROR] RACER_TIMEOUT must be an integer." >&2
+        return 1
+    fi
+    if ! [[ "$RACER_CONCURRENCY" =~ ^[1-9][0-9]*$ ]]; then
+        echo "[ERROR] RACER_CONCURRENCY must be a positive integer." >&2
+        return 1
+    fi
+    if ! [[ "$MAX_RETRY_ATTEMPTS" =~ ^[0-9]+$ ]]; then
+        echo "[ERROR] MAX_RETRY_ATTEMPTS must be an integer >= 0." >&2
+        return 1
+    fi
+
+    # String validation
+    if [[ "$ESCALATION_POLICY" != "linear" && "$ESCALATION_POLICY" != "exponential" ]]; then
+        echo "[ERROR] ESCALATION_POLICY must be 'linear' or 'exponential'." >&2
+        return 1
+    fi
+    if [[ "$ENABLE_HEURISTIC_TRACING" != "true" && "$ENABLE_HEURISTIC_TRACING" != "false" ]]; then
+        echo "[ERROR] ENABLE_HEURISTIC_TRACING must be 'true' or 'false'." >&2
         return 1
     fi
 
