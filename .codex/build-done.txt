@@ -1,2 +1,3 @@
 skill-manifest.yaml
 scripts/penetration-test.py
+references/README.md
