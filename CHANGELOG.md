@@ -17,3 +17,4 @@
 - [2026-05-17 10:09] references/README.md
 - [2026-05-17 10:46] SKILL.md
 - [2026-05-17 10:51] SKILL.md
+- [2026-05-17 11:06] home/godmode/config/prefill.json
