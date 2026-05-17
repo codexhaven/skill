@@ -3,7 +3,7 @@ import os
 from typing import Optional, List
 
 # Add project root to path for module resolution
-PROJECT_ROOT = "/data/data/com.termux/files/home/godmode"
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
