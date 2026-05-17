@@ -6,6 +6,9 @@ import logging
 import time
 from typing import List, Dict, Any, Optional
 
+# Import scorer for injection
+from home.godmode.engine.scorer import Scorer
+
 # Configure logging for production observability
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ULTRAPLINIANRacer")
@@ -28,30 +31,32 @@ class ULTRAPLINIANRacer:
         self.models = models
         self.timeout = timeout
         self.api_key = os.getenv("OPENROUTER_KEY")
+        self.referer = os.getenv("APP_REFERER", "https://github.com/codex-developer/godmode")
+        self.title = os.getenv("APP_TITLE", "GodMode-Racer")
+        self.session: Optional[aiohttp.ClientSession] = None
+        self.scorer = Scorer()
+        
         if not self.api_key:
             logger.warning("OPENROUTER_KEY not found in environment. Requests may fail.")
+
+    async def _ensure_session(self):
+        if self.session is None or self.session.closed:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": self.referer,
+                "X-Title": self.title
+            }
+            self.session = aiohttp.ClientSession(headers=headers)
 
     async def _query_model(self, model: str, prompt: str) -> Dict[str, Any]:
         """
         Executes a single model inference via OpenRouter API.
-        
-        Args:
-            model (str): Target model identifier.
-            prompt (str): Adversarial payload.
-            
-        Returns:
-            Dict[str, Any]: Model response dictionary including score and latency.
         """
         if not prompt or not isinstance(prompt, str):
             return {"model": model, "error": "Invalid prompt input", "score": 0.0}
             
         url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/codex-developer/godmode",
-            "X-Title": "GodMode-Racer"
-        }
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}]
@@ -59,22 +64,26 @@ class ULTRAPLINIANRacer:
         
         start_time = time.perf_counter()
         try:
-            async with aiohttp.ClientSession(headers=headers) as session:
-                async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=self.timeout)) as response:
-                    data = await response.json()
-                    latency = time.perf_counter() - start_time
-                    
-                    if response.status != 200:
-                        error_msg = data.get("error", {}).get("message", str(data))
-                        return {"model": model, "error": f"API Error {response.status}: {error_msg}", "score": 0.0, "latency": latency}
-                    
-                    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
-                    return {
-                        "model": model,
-                        "response": content,
-                        "latency": latency,
-                        "score": 1.0 # Placeholder: Integrate with scorer.py here
-                    }
+            await self._ensure_session()
+            async with self.session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=self.timeout)) as response:
+                data = await response.json()
+                latency = time.perf_counter() - start_time
+                
+                if response.status != 200:
+                    error_msg = data.get("error", {}).get("message", str(data))
+                    logger.error(f"API Error {model} ({response.status}): {error_msg}")
+                    return {"model": model, "error": f"API Error {response.status}", "score": 0.0, "latency": latency}
+                
+                content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                score = self.scorer.score(content)
+                
+                logger.info(f"Query successful: {model} | Latency: {latency:.2f}s | Score: {score}")
+                return {
+                    "model": model,
+                    "response": content,
+                    "latency": latency,
+                    "score": score
+                }
         except asyncio.TimeoutError:
             return {"model": model, "error": "Request timed out", "score": 0.0, "latency": time.perf_counter() - start_time}
         except Exception as e:
@@ -84,28 +93,22 @@ class ULTRAPLINIANRacer:
     async def race(self, prompt: str) -> List[Dict[str, Any]]:
         """
         Executes parallel racing of all initialized models.
-        
-        Args:
-            prompt (str): The adversarial payload to send.
-            
-        Returns:
-            List[Dict]: Results sorted by score in descending order.
         """
         if not prompt or not isinstance(prompt, str):
             logger.warning("Empty or invalid prompt provided to race.")
             return []
         
         tasks = [self._query_model(model, prompt) for model in self.models]
-        # Use return_exceptions=True to ensure one failure doesn't kill the batch
         completed = await asyncio.gather(*tasks, return_exceptions=True)
             
-        # Sanitize: filter non-dict results (e.g., exceptions)
         valid_results = [res for res in completed if isinstance(res, dict)]
             
-        # Sort by score descending; ensure float comparison
         return sorted(valid_results, key=lambda x: float(x.get("score", 0.0)), reverse=True)
+
+    async def close(self):
+        if self.session:
+            await self.session.close()
             
 
 def initialize_racer(models: List[str], timeout: int = 30) -> ULTRAPLINIANRacer:
-    """Factory function for racer initialization."""
     return ULTRAPLINIANRacer(models, timeout)
