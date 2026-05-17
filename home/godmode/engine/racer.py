@@ -1,3 +1,4 @@
+
 import asyncio
 import os
 import aiohttp
@@ -36,7 +37,7 @@ class ULTRAPLINIANRacer:
         self.scorer = Scorer()
         
         if not self.api_key:
-            logger.warning("OPENROUTER_KEY not found in environment. Requests may fail.")
+            logger.warning("OPENROUTER_KEY not found in environment. Requests will likely fail.")
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Returns the shared aiohttp session, initializing if necessary."""
@@ -47,7 +48,8 @@ class ULTRAPLINIANRacer:
                 "HTTP-Referer": self.referer,
                 "X-Title": self.title
             }
-            conn = aiohttp.TCPConnector(limit=len(self.models))
+            # Limit connection pool to model count + small buffer
+            conn = aiohttp.TCPConnector(limit=max(1, len(self.models) + 2))
             self.session = aiohttp.ClientSession(headers=headers, connector=conn)
         return self.session
 
@@ -56,6 +58,7 @@ class ULTRAPLINIANRacer:
         Executes a single model inference via OpenRouter API with robust error handling.
         """
         if not prompt or not isinstance(prompt, str):
+            logger.error(f"Invalid prompt for {model}")
             return {"model": model, "error": "Invalid prompt input", "score": 0.0, "latency": 0.0}
             
         payload = {
@@ -69,17 +72,25 @@ class ULTRAPLINIANRacer:
             async with session.post(self.api_url, json=payload, timeout=aiohttp.ClientTimeout(total=self.timeout)) as response:
                 latency = time.perf_counter() - start_time
                 
+                # Read response body early to ensure connection reuse
                 try:
                     data = await response.json()
-                except Exception:
-                    data = {"error": "Failed to parse API response"}
+                except Exception as e:
+                    logger.error(f"Failed to parse JSON from {model}: {e}")
+                    data = {"error": "API response format invalid"}
                 
                 if response.status != 200:
-                    error_msg = data.get("error", {}).get("message", str(data))
-                    logger.error(f"API Error {model} ({response.status}): {error_msg}")
-                    return {"model": model, "error": f"API Error {response.status}", "score": 0.0, "latency": latency}
+                    # Robust error extraction
+                    err_msg = "Unknown API Error"
+                    if isinstance(data, dict):
+                        err_msg = str(data.get("error", data))
+                    logger.error(f"API Error {model} ({response.status}): {err_msg}")
+                    return {"model": model, "error": f"API {response.status}", "score": 0.0, "latency": latency}
                 
-                content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                # Safe path extraction
+                choices = data.get("choices", [])
+                content = choices[0].get("message", {}).get("content", "") if choices else ""
+                
                 score = self.scorer.score(content)
                 
                 logger.info(f"Query successful: {model} | Status: {response.status} | Latency: {latency:.2f}s | Score: {score}")
@@ -94,12 +105,13 @@ class ULTRAPLINIANRacer:
             logger.warning(f"Timeout on {model} after {latency:.2f}s")
             return {"model": model, "error": "Request timed out", "score": 0.0, "latency": latency}
         except Exception as e:
-            logger.error(f"Error querying {model}: {str(e)}")
-            return {"model": model, "error": str(e), "score": 0.0, "latency": time.perf_counter() - start_time}
+            logger.error(f"Critical error querying {model}: {str(e)}")
+            return {"model": model, "error": type(e).__name__, "score": 0.0, "latency": time.perf_counter() - start_time}
 
     async def race(self, prompt: str) -> List[Dict[str, Any]]:
         """
         Executes parallel racing of all initialized models.
+        Returns: Results sorted by score (desc) then latency (asc).
         """
         if not prompt or not isinstance(prompt, str):
             logger.warning("Empty or invalid prompt provided to race.")
@@ -108,9 +120,15 @@ class ULTRAPLINIANRacer:
         tasks = [self._query_model(model, prompt) for model in self.models]
         completed = await asyncio.gather(*tasks)
             
-        valid_results = [res for res in completed if isinstance(res, dict)]
+        # Ensure we filter out any unexpectedly malformed results
+        valid_results = [res for res in completed if isinstance(res, dict) and "model" in res]
             
-        return sorted(valid_results, key=lambda x: (float(x.get("score", 0.0)), -float(x.get("latency", 0.0))), reverse=True)
+        # Sort: Primary=Score (desc), Secondary=Latency (asc, lower is better)
+        return sorted(
+            valid_results, 
+            key=lambda x: (float(x.get("score", 0.0)), -float(x.get("latency", 999.0))), 
+            reverse=True
+        )
 
     async def close(self):
         """Clean up the aiohttp session."""
