@@ -1,0 +1,5 @@
+Finding | Risk: level | Fix: action
+File: SKILL.md | Hardcoded local path assumptions | Risk: Medium | Fix: Add 'Setup' step to explicitly verify directory with 'pwd' or document mandatory absolute paths for execution.
+File: SKILL.md | Missing dependency requirements | Risk: Medium | Fix: Add 'Requirements' section listing necessary python packages (e.g., requirements.txt) and system prerequisites.
+File: SKILL.md | Missing safety/compliance disclaimer | Risk: High | Fix: Add explicit 'Safety Disclaimer' section regarding responsible use and adherence to platform policies.
+File: SKILL.md | Lack of error handling documentation | Risk: Low | Fix: Add a 'Troubleshooting' section detailing common failure modes like '401 Unauthorized' or 'Rate Limit' and how to mitigate.

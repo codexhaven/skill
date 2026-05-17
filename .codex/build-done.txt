@@ -1,2 +1,1 @@
-NEW: main.py
-NEW: racer.py
+skill-manifest.yaml
