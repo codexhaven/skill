@@ -5,8 +5,6 @@ import logging
 import time
 from typing import List, Dict, Any, Optional
 
-# Import scorer for injection
-# Assuming relative path from current project root or sys.path includes ~/
 from godmode.engine.scorer import Scorer
 
 # Configure logging for production observability
@@ -31,6 +29,7 @@ class ULTRAPLINIANRacer:
         self.models = models
         self.timeout = float(timeout)
         self.api_key = os.getenv("OPENROUTER_KEY")
+        self.api_url = "https://openrouter.ai/api/v1/chat/completions"
         self.referer = os.getenv("APP_REFERER", "https://github.com/codex-developer/godmode")
         self.title = os.getenv("APP_TITLE", "GodMode-Racer")
         self.session: Optional[aiohttp.ClientSession] = None
@@ -39,18 +38,18 @@ class ULTRAPLINIANRacer:
         if not self.api_key:
             logger.warning("OPENROUTER_KEY not found in environment. Requests may fail.")
 
-    async def _ensure_session(self):
-        """Initializes a shared aiohttp session with required authentication headers."""
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Returns the shared aiohttp session, initializing if necessary."""
         if self.session is None or self.session.closed:
             headers = {
-                "Authorization": f"Bearer {self.api_key}",
+                "Authorization": f"Bearer {self.api_key}" if self.api_key else "",
                 "Content-Type": "application/json",
                 "HTTP-Referer": self.referer,
                 "X-Title": self.title
             }
-            # Use TCPConnector for performance in high-concurrency scenarios
             conn = aiohttp.TCPConnector(limit=len(self.models))
             self.session = aiohttp.ClientSession(headers=headers, connector=conn)
+        return self.session
 
     async def _query_model(self, model: str, prompt: str) -> Dict[str, Any]:
         """
@@ -59,7 +58,6 @@ class ULTRAPLINIANRacer:
         if not prompt or not isinstance(prompt, str):
             return {"model": model, "error": "Invalid prompt input", "score": 0.0, "latency": 0.0}
             
-        url = "https://openrouter.ai/api/v1/chat/completions"
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}]
@@ -67,11 +65,10 @@ class ULTRAPLINIANRacer:
         
         start_time = time.perf_counter()
         try:
-            await self._ensure_session()
-            async with self.session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=self.timeout)) as response:
+            session = await self._get_session()
+            async with session.post(self.api_url, json=payload, timeout=aiohttp.ClientTimeout(total=self.timeout)) as response:
                 latency = time.perf_counter() - start_time
                 
-                # Read response body safely
                 try:
                     data = await response.json()
                 except Exception:
@@ -85,7 +82,7 @@ class ULTRAPLINIANRacer:
                 content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
                 score = self.scorer.score(content)
                 
-                logger.info(f"Query successful: {model} | Latency: {latency:.2f}s | Score: {score}")
+                logger.info(f"Query successful: {model} | Status: {response.status} | Latency: {latency:.2f}s | Score: {score}")
                 return {
                     "model": model,
                     "response": content,
@@ -103,11 +100,6 @@ class ULTRAPLINIANRacer:
     async def race(self, prompt: str) -> List[Dict[str, Any]]:
         """
         Executes parallel racing of all initialized models.
-        
-        Args:
-            prompt (str): The adversarial prompt to submit.
-        Returns:
-            List[Dict[str, Any]]: Sorted results list by score descending.
         """
         if not prompt or not isinstance(prompt, str):
             logger.warning("Empty or invalid prompt provided to race.")
@@ -116,10 +108,8 @@ class ULTRAPLINIANRacer:
         tasks = [self._query_model(model, prompt) for model in self.models]
         completed = await asyncio.gather(*tasks)
             
-        # Filter results: return list of dictionaries
         valid_results = [res for res in completed if isinstance(res, dict)]
             
-        # Return sorted by score DESC, then latency ASC (tie-breaker)
         return sorted(valid_results, key=lambda x: (float(x.get("score", 0.0)), -float(x.get("latency", 0.0))), reverse=True)
 
     async def close(self):
